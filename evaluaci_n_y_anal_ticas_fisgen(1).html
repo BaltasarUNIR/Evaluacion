@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación y Analíticas: FisGen Project</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        physics: { 50: '#eff6ff', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' },
+                        ai: { 50: '#faf5ff', 500: '#a855f7', 600: '#9333ea', 900: '#581c87' },
+                        teacher: { 50: '#f0fdf4', 500: '#22c55e', 600: '#16a34a', 900: '#14532d' },
+                        self: { 50: '#fffbeb', 500: '#f59e0b', 600: '#d97706', 900: '#78350f' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .option-bubble { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        .ai-glow { animation: pulse-soft 3s infinite; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- CABECERA PRINCIPAL -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-gradient-to-br from-physics-600 to-ai-600 rounded-xl shadow-md ai-glow text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black text-slate-900 leading-none tracking-tight">FisGen <span class="text-transparent bg-clip-text bg-gradient-to-r from-physics-600 to-ai-600">Portal de Evaluación</span></h1>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Marco UNIR / Competencia Digital & IA Docente</p>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1">
+                <button id="nav-student" onclick="switchView('student')" class="px-4 py-2 rounded-xl text-xs font-black transition-all bg-white text-physics-900 shadow-sm">🎓 ALUMNADO</button>
+                <button id="nav-self" onclick="switchView('self')" class="px-4 py-2 rounded-xl text-xs font-black transition-all text-slate-500 hover:text-slate-800">👩‍🏫 MI AUTOEVALUACIÓN</button>
+                <button id="nav-dashboard" onclick="switchView('dashboard')" class="px-4 py-2 rounded-xl text-xs font-black transition-all text-slate-500 hover:text-slate-800">📊 PANEL DOCENTE</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8">
+
+        <!-- ================= SECCIÓN ALUMNADO ================= -->
+        <section id="section-student" class="space-y-6">
+            <div class="bg-gradient-to-br from-white to-physics-50 p-6 rounded-3xl border border-physics-100 shadow-sm">
+                <h2 class="text-2xl font-black text-slate-900 mb-1">¡Tu experiencia nos ayuda a mejorar! 🚀</h2>
+                <p class="text-sm text-slate-600">Esta encuesta nos permite comprender cómo el uso del asistente virtual influye en tu aprendizaje. Es confidencial.</p>
+                <div class="mt-4 flex gap-2">
+                    <input type="text" id="student-course" placeholder="Tu curso (ej. 2º ESO B)" class="text-sm bg-white border border-slate-200 rounded-xl px-4 py-2.5 w-full max-w-xs focus:ring-2 focus:ring-physics-500 outline-none font-medium">
+                </div>
+            </div>
+
+            <form id="student-form" onsubmit="submitStudentSurvey(event)" class="space-y-6">
+                <!-- Bloque 1: Chatbot FisGen -->
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-5">
+                    <div class="flex items-center gap-2 text-physics-600 mb-2">
+                        <span class="text-2xl">🤖</span>
+                        <h3 class="font-black text-sm uppercase tracking-wider text-slate-900">Sobre el Chatbot (FisGen)</h3>
+                    </div>
+                    <div id="container-student-fisgen" class="space-y-6"></div>
+                    <div class="pt-4 border-t border-slate-100">
+                        <label class="block text-sm font-bold text-slate-800 mb-2">¿Qué mejorarías de FisGen para que te resultara aún más útil en tu aprendizaje?</label>
+                        <textarea id="sq_open_fisgen" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-physics-500 outline-none transition" rows="3" placeholder="Escribe tu propuesta..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Bloque 2: Competencia IA (Rúbrica) -->
+                <div class="bg-ai-50/50 rounded-3xl p-6 shadow-sm border border-ai-100 space-y-5">
+                    <div class="flex items-center gap-2 text-ai-600 mb-2">
+                        <span class="text-2xl">🧠</span>
+                        <h3 class="font-black text-sm uppercase tracking-wider text-slate-900">Tu Uso de la Inteligencia Artificial</h3>
+                    </div>
+                    <p class="text-xs text-ai-900/70 italic">Valora tus hábitos de trabajo apoyándote en la IA durante esta unidad:</p>
+                    <div id="container-student-ai" class="space-y-6"></div>
+                </div>
+
+                <!-- Bloque 3: Papel del Docente -->
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-5">
+                    <div class="flex items-center gap-2 text-emerald-600 mb-2">
+                        <span class="text-2xl">🧑‍🏫</span>
+                        <h3 class="font-black text-sm uppercase tracking-wider text-slate-900">El papel de tu profesor/a</h3>
+                    </div>
+                    <div id="container-student-teacher" class="space-y-6"></div>
+                    <div class="pt-4 border-t border-slate-100">
+                        <label class="block text-sm font-bold text-slate-800 mb-2">¿En qué momentos sentiste que la ayuda del profesor era más valiosa que la del chatbot?</label>
+                        <textarea id="sq_open_teacher" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-physics-500 outline-none transition" rows="3" placeholder="Describe una situación en la que preferiste la ayuda de tu docente..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Control de envío del alumno -->
+                <div class="flex items-center justify-between p-4 bg-slate-900 rounded-3xl shadow-xl sticky bottom-4">
+                    <div class="hidden sm:block pl-2">
+                        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Preguntas completadas</div>
+                        <div class="w-32 bg-slate-800 h-1.5 rounded-full mt-1 overflow-hidden">
+                            <div id="student-progress-bar" class="bg-gradient-to-r from-physics-500 to-ai-500 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full sm:w-auto bg-gradient-to-r from-physics-600 to-ai-600 hover:from-physics-700 hover:to-ai-700 text-white font-extrabold px-8 py-3.5 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
+                        Enviar mi encuesta
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- ================= SECCIÓN AUTOEVALUACIÓN DOCENTE (NUEVO) ================= -->
+        <section id="section-self" class="hidden space-y-6">
+            <div class="bg-gradient-to-br from-white to-self-50 p-6 rounded-3xl border border-self-100 shadow-sm">
+                <h2 class="text-2xl font-black text-slate-900 mb-1">Autoevaluación del Docente 📝</h2>
+                <p class="text-sm text-slate-600">Herramienta de reflexión personal sobre la actividad con el chatbot FisGen para la unidad de <strong>Estructura Atómica</strong>.</p>
+            </div>
+
+            <form id="teacher-self-form" onsubmit="submitTeacherSelfSurvey(event)" class="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 space-y-6">
+                <div class="border-b border-slate-100 pb-4">
+                    <h3 class="font-bold text-lg text-slate-900">Variables de Práctica Profesional</h3>
+                    <p class="text-xs text-slate-500">Por favor, valora las siguientes afirmaciones de 1 (Totalmente en desacuerdo) a 5 (Totalmente de acuerdo).</p>
+                </div>
+
+                <div id="container-self-questions" class="space-y-6"></div>
+
+                <div class="pt-4 border-t border-slate-100 space-y-6">
+                    <div>
+                        <label for="tq_open_prompt" class="block text-sm font-bold text-slate-800 mb-2">¿Qué parte del prompt de FisGen necesita ser ajustada para la próxima vez que se utilice la actividad?</label>
+                        <textarea id="tq_open_prompt" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-self-500 outline-none transition" rows="3" placeholder="Sugerencias de prompts, instrucciones erráticas, comportamientos del bot a refinar..."></textarea>
+                    </div>
+
+                    <div>
+                        <label for="tq_open_difficulties" class="block text-sm font-bold text-slate-800 mb-2">¿Qué dificultades imprevistas surgieron al combinar la resolución digital con la escritura en la libreta física?</label>
+                        <textarea id="tq_open_difficulties" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-self-500 outline-none transition" rows="3" placeholder="Problemas con la toma de fotos, desorganización, desfases temporales..."></textarea>
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end">
+                    <button type="submit" class="w-full sm:w-auto bg-self-600 hover:bg-self-700 text-white font-extrabold px-8 py-3.5 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
+                        Guardar mi Autoevaluación
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- PANTALLA DE ÉXITO -->
+        <section id="section-success" class="hidden text-center py-20 space-y-6">
+            <div class="text-6xl animate-bounce">✨</div>
+            <h2 class="text-3xl font-black text-slate-900">¡Registro Guardado!</h2>
+            <p class="text-slate-500 max-w-sm mx-auto text-sm">Los datos se han guardado con éxito localmente. Gracias por documentar tu práctica educativa.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="restartForms()" class="bg-slate-950 text-white px-6 py-3 rounded-2xl font-bold text-xs hover:bg-slate-800 transition">Hacer otro registro</button>
+            </div>
+        </section>
+
+        <!-- ================= MODO PANEL DE CONTROL (DASHBOARD) ================= -->
+        <section id="section-teacher" class="hidden space-y-6">
+            <!-- Autenticación Mock -->
+            <div id="teacher-auth" class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm max-w-sm mx-auto text-center space-y-4">
+                <div class="w-12 h-12 bg-physics-50 text-physics-600 rounded-full flex items-center justify-center mx-auto text-xl">🔐</div>
+                <h3 class="font-black text-slate-950 text-lg">Acceso Protegido</h3>
+                <p class="text-xs text-slate-500">Introduce la contraseña docente para visualizar las métricas consolidadas de alumnos y profesores.</p>
+                <div class="space-y-3">
+                    <input type="password" id="teacher-pass" placeholder="Contraseña (profesor)" class="w-full border border-slate-200 p-3 rounded-xl text-center text-sm focus:outline-none focus:ring-2 focus:ring-physics-500">
+                    <button onclick="unlockDashboard()" class="w-full bg-slate-900 hover:bg-slate-800 text-white p-3 rounded-xl font-bold text-sm transition">Entrar al Panel</button>
+                </div>
+                <p id="auth-error-msg" class="text-xs text-rose-500 font-bold hidden">Contraseña incorrecta. Pista: 'profesor'</p>
+            </div>
+
+            <!-- Dashboard Desbloqueado -->
+            <div id="teacher-db" class="hidden space-y-6">
+                <!-- Encabezado del Panel -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl border border-slate-200 gap-4">
+                    <div>
+                        <h2 class="text-xl font-black text-slate-900">Análisis y Resultados de Práctica</h2>
+                        <div class="flex gap-4 mt-1">
+                            <span id="badge-students" class="text-xs font-bold text-slate-500 uppercase">0 respuestas alumnado</span>
+                            <span id="badge-teachers" class="text-xs font-bold text-slate-500 uppercase">0 autoevaluaciones docentes</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <button onclick="exportStudentsCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition">
+                            📥 EXPORTAR ALUMNOS
+                        </button>
+                        <button onclick="exportTeacherSelfCSV()" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition">
+                            📥 EXPORTAR DOCENTES
+                        </button>
+                        <button onclick="showClearModal()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2.5 rounded-xl text-xs font-black transition">
+                            REINICIAR DATOS
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PESTAÑAS DE VISUALIZACIÓN EN EL PANEL -->
+                <div class="flex bg-slate-200 p-1 rounded-2xl max-w-md">
+                    <button id="tab-student-metrics" onclick="switchDashboardTab('students')" class="flex-1 py-2 rounded-xl text-xs font-black transition bg-white text-slate-900 shadow-sm">MÉTRICAS DE ALUMNOS</button>
+                    <button id="tab-teacher-metrics" onclick="switchDashboardTab('teachers')" class="flex-1 py-2 rounded-xl text-xs font-black transition text-slate-500 hover:text-slate-800">MÉTRICAS DE DOCENTES</button>
+                </div>
+
+                <!-- CONTENEDOR 1: MÉTRICAS DEL ALUMNADO -->
+                <div id="container-db-students" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-80">
+                            <h4 class="text-xs font-black uppercase text-slate-400 mb-3">Medias Globales (FisGen vs Docente)</h4>
+                            <div class="relative h-56"><canvas id="chart-avg"></canvas></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-80">
+                            <h4 class="text-xs font-black uppercase text-slate-400 mb-3">Mapeo de Competencia IA Alumnado (Rúbrica)</h4>
+                            <div class="relative h-56"><canvas id="chart-radar"></canvas></div>
+                        </div>
+                    </div>
+
+                    <!-- Comentarios Alumnos -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-96">
+                            <h4 class="text-xs font-black uppercase text-slate-400 mb-3">💡 Ideas de mejora para FisGen (Q6)</h4>
+                            <div id="sc-open-fisgen" class="overflow-y-auto pr-1 flex-grow space-y-3 no-scrollbar text-xs"></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-96">
+                            <h4 class="text-xs font-black uppercase text-slate-400 mb-3">🏫 Momentos con mayor valor del docente (Q10)</h4>
+                            <div id="sc-open-teacher" class="overflow-y-auto pr-1 flex-grow space-y-3 no-scrollbar text-xs"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla Alumnos -->
+                    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="p-4 bg-slate-50 border-b border-slate-200 font-black text-xs uppercase tracking-wider text-slate-500">Muestras del Alumnado</div>
+                        <div class="overflow-x-auto no-scrollbar">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-100 text-slate-500 font-bold border-b border-slate-200">
+                                    <tr>
+                                        <th class="p-4">Fecha</th>
+                                        <th class="p-4">Curso</th>
+                                        <th class="p-4 text-center">FisGen (1-5)</th>
+                                        <th class="p-4 text-center">Competencia IA (1-5)</th>
+                                        <th class="p-4 text-center">Apoyo Docente (1-5)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-students-body" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTENEDOR 2: MÉTRICAS DEL DOCENTE (NUEVO) -->
+                <div id="container-db-teachers" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 gap-6">
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-[400px]">
+                            <h4 class="text-xs font-black uppercase text-slate-400 mb-4">Autoevaluación Docente: Grado de Cumplimiento (1-5)</h4>
+                            <div class="relative h-72"><canvas id="chart-teacher-self"></canvas></div>
+                        </div>
+                    </div>
+
+                    <!-- Comentarios Docente -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-96">
+                            <h4 class="text-xs font-black uppercase text-slate-400 mb-3">🛠️ Ajustes del Prompt sugeridos</h4>
+                            <div id="tc-open-prompt" class="overflow-y-auto pr-1 flex-grow space-y-3 no-scrollbar text-xs"></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-96">
+                            <h4 class="text-xs font-black uppercase text-slate-400 mb-3">⚠️ Dificultades al combinar libreta e IA</h4>
+                            <div id="tc-open-difficulties" class="overflow-y-auto pr-1 flex-grow space-y-3 no-scrollbar text-xs"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL DE CONFIRMACIÓN -->
+    <div id="modal-clear" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+        <div class="bg-white p-6 rounded-3xl shadow-xl border border-slate-200 max-w-sm w-full space-y-4">
+            <h3 class="font-black text-slate-900 text-lg">¿Reiniciar todos los registros?</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Esta acción eliminará de forma irreversible tanto las respuestas guardadas por los alumnos como tus reflexiones de autoevaluación.</p>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeClearModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">Cancelar</button>
+                <button onclick="clearAllData()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700">Eliminar permanentemente</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= DATOS Y CONFIGURACIÓN =================
+        const SURVEY_SCHEMA = {
+            student: {
+                fisgen: [
+                    { id: 'sf1', text: 'Las instrucciones iniciales dadas por FisGen para comenzar a jugar fueron claras y fáciles de seguir.' },
+                    { id: 'sf2', text: 'El chatbot me proporcionaba pistas útiles que me ayudaban a encontrar la respuesta correcta cuando me equivocaba.' },
+                    { id: 'sf3', text: 'El sistema de gamificación (ganar puntos y lograr estrellas) me motivó a seguir resolviendo los ejercicios de física y química.' },
+                    { id: 'sf4', text: 'Sentí que el nivel de dificultad de las preguntas generadas por FisGen se adaptaba adecuadamente a lo explicado en clase.' },
+                    { id: 'sf5', text: 'El proceso de obtener la contraseña final de FisGen y subir los ejercicios a Moodle funcionó sin problemas técnicos.' }
+                ],
+                ai: [
+                    { id: 'sai1', text: 'Prompts: Redacto instrucciones detalladas añadiendo contexto y formato.', label: 'Prompts' },
+                    { id: 'sai2', text: 'Verificación: Contrasté la información de la IA con mis apuntes o libros.', label: 'Verificar' },
+                    { id: 'sai3', text: 'Ética: He citado y declarado explícitamente el uso de la IA en mis trabajos.', label: 'Ética' },
+                    { id: 'sai4', text: 'Edición: Modifiqué las respuestas de la IA para que tuvieran mi propio estilo.', label: 'Edición' },
+                    { id: 'sai5', text: 'Uso Socrático: Usé la IA para entender los pasos, no solo para obtener la respuesta.', label: 'Socrático' }
+                ],
+                teacher: [
+                    { id: 'st1', text: 'Las explicaciones previas del profesor fueron fundamentales para poder resolver los ejercicios que proponía el chatbot.' },
+                    { id: 'st2', text: 'El profesor estuvo disponible para resolver mis dudas cuando el chatbot no lograba explicarme algo con claridad.' },
+                    { id: 'st3', text: 'La ayuda del profesor fue útil para resolver problemas técnicos (por ejemplo, cómo hacer o subir las fotos a Moodle).' }
+                ]
+            },
+            teacherSelf: [
+                { id: 't1', text: 'Gestión del Aula: El uso del chatbot FisGen me permitió disponer de más tiempo para atender de manera personalizada a los alumnos que más lo necesitaban.' },
+                { id: 't2', text: 'Eficiencia de la Herramienta: El chatbot se ciñó a los apuntes proporcionados ("2nFQ_04 Estructura atómica") y no generó alucinaciones significativas.' },
+                { id: 't3', text: 'Logro de Objetivos: Los alumnos lograron asimilar los conceptos de estructura atómica (modelos, partículas, números atómicos/másicos, tabla periódica) mediante esta dinámica.' },
+                { id: 't4', text: 'Competencia Digital: La actividad mejoró efectivamente la competencia de los estudiantes en el uso de plataformas como Moodle y el manejo de archivos digitales.' },
+                { id: 't5', text: 'Prevención de Plagio: El "protocolo de detección de plagio" integrado en las instrucciones de FisGen funcionó de manera de efectiva y disuadió a los estudiantes de copiar respuestas.' }
+            ]
+        };
+
+        // Almacenamientos persistentes independientes
+        let dbStudents = JSON.parse(localStorage.getItem('fisgen_db_students')) || [];
+        let dbTeachers = JSON.parse(localStorage.getItem('fisgen_db_teachers')) || [];
+        let currentView = 'student';
+        let isDashboardUnlocked = sessionStorage.getItem('dashboard_unlocked') === 'true';
+        let currentDbTab = 'students';
+        let activeCharts = {};
+
+        window.onload = () => {
+            renderStudentSurvey();
+            renderTeacherSelfSurvey();
+            updateStudentProgress();
+            if (isDashboardUnlocked) {
+                document.getElementById('teacher-auth').classList.add('hidden');
+                document.getElementById('teacher-db').classList.remove('hidden');
+                renderDashboardMetrics();
+            }
+        };
+
+        // Cambios de vistas principales del Portal
+        function switchView(view) {
+            currentView = view;
+            
+            // Paneles
+            document.getElementById('section-student').classList.toggle('hidden', view !== 'student');
+            document.getElementById('section-self').classList.toggle('hidden', view !== 'self');
+            document.getElementById('section-teacher').classList.toggle('hidden', view !== 'dashboard');
+            document.getElementById('section-success').classList.add('hidden');
+
+            // Botones de navegación
+            document.getElementById('nav-student').className = `px-4 py-2 rounded-xl text-xs font-black transition-all ${view === 'student' ? 'bg-white text-physics-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`;
+            document.getElementById('nav-self').className = `px-4 py-2 rounded-xl text-xs font-black transition-all ${view === 'self' ? 'bg-white text-self-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`;
+            document.getElementById('nav-dashboard').className = `px-4 py-2 rounded-xl text-xs font-black transition-all ${view === 'dashboard' ? 'bg-white text-physics-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`;
+
+            if (view === 'dashboard' && isDashboardUnlocked) {
+                renderDashboardMetrics();
+            }
+        }
+
+        // ================= CONSTRUCCIÓN DE FORMULARIOS =================
+        function renderStudentSurvey() {
+            buildQuestionBlocks('container-student-fisgen', SURVEY_SCHEMA.student.fisgen, 'physics');
+            buildQuestionBlocks('container-student-ai', SURVEY_SCHEMA.student.ai, 'ai');
+            buildQuestionBlocks('container-student-teacher', SURVEY_SCHEMA.student.teacher, 'teacher');
+        }
+
+        function renderTeacherSelfSurvey() {
+            buildQuestionBlocks('container-self-questions', SURVEY_SCHEMA.teacherSelf, 'self');
+        }
+
+        function buildQuestionBlocks(targetId, list, colorClass) {
+            const container = document.getElementById(targetId);
+            container.innerHTML = '';
+            list.forEach((item, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'space-y-2';
+                
+                let extraTag = '';
+                if(item.label) {
+                    extraTag = `<span class="bg-ai-100 text-ai-700 text-[10px] px-2 py-0.5 rounded-full font-bold ml-1.5 uppercase">${item.label}</span>`;
+                }
+
+                questionDiv.innerHTML = `
+                    <p class="text-xs sm:text-sm font-semibold text-slate-800 leading-snug">${item.text} ${extraTag}</p>
+                    <div class="flex justify-between max-w-sm gap-1.5 mt-2">
+                        ${[1, 2, 3, 4, 5].map(v => `
+                            <button type="button" 
+                                onclick="registerValue('${item.id}', ${v}, this, '${colorClass}')" 
+                                class="btn-group-${item.id} option-bubble w-9 h-9 sm:w-10 sm:h-10 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-400 font-extrabold text-xs sm:text-sm hover:border-${colorClass}-300 hover:text-slate-600 focus:outline-none">
+                                ${v}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <input type="hidden" id="val-${item.id}" name="${item.id}" required>
+                `;
+                container.appendChild(questionDiv);
+            });
+        }
+
+        // Registrar valoración en botones interactivos
+        function registerValue(questionId, value, element, color) {
+            document.getElementById(`val-${questionId}`).value = value;
+            
+            // Limpiar activos del grupo
+            document.querySelectorAll(`.btn-group-${questionId}`).forEach(btn => {
+                btn.className = `btn-group-${questionId} option-bubble w-9 h-9 sm:w-10 sm:h-10 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-400 font-extrabold text-xs sm:text-sm hover:border-${color}-300 hover:text-slate-600 focus:outline-none`;
+            });
+
+            // Activar botón seleccionado
+            const activeColors = {
+                physics: 'bg-physics-600 border-physics-600 text-white shadow-md shadow-physics-100 scale-105',
+                ai: 'bg-ai-600 border-ai-600 text-white shadow-md shadow-ai-100 scale-105',
+                teacher: 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-100 scale-105',
+                self: 'bg-self-600 border-self-600 text-white shadow-md shadow-self-100 scale-105'
+            };
+
+            element.className = `btn-group-${questionId} option-bubble w-9 h-9 sm:w-10 sm:h-10 rounded-xl border-2 font-black text-xs sm:text-sm focus:outline-none ${activeColors[color]}`;
+            
+            if (currentView === 'student') {
+                updateStudentProgress();
+            }
+        }
+
+        function updateStudentProgress() {
+            const studentVariables = [...SURVEY_SCHEMA.student.fisgen, ...SURVEY_SCHEMA.student.ai, ...SURVEY_SCHEMA.student.teacher];
+            const total = studentVariables.length;
+            let answered = 0;
+            studentVariables.forEach(item => {
+                if (document.getElementById(`val-${item.id}`).value) answered++;
+            });
+            const progress = (answered / total) * 100;
+            document.getElementById('student-progress-bar').style.width = `${progress}%`;
+        }
+
+        // ================= ENVÍO DE DATOS =================
+        function submitStudentSurvey(e) {
+            e.preventDefault();
+            
+            const payload = {
+                id: 'std_' + Date.now(),
+                date: new Date().toLocaleString('es-ES'),
+                course: document.getElementById('student-course').value.trim() || 'Anónimo',
+                open_fisgen: document.getElementById('sq_open_fisgen').value.trim(),
+                open_teacher: document.getElementById('sq_open_teacher').value.trim()
+            };
+
+            const studentVariables = [...SURVEY_SCHEMA.student.fisgen, ...SURVEY_SCHEMA.student.ai, ...SURVEY_SCHEMA.student.teacher];
+            let hasMissing = false;
+
+            studentVariables.forEach(v => {
+                const value = document.getElementById(`val-${v.id}`).value;
+                if (!value) hasMissing = true;
+                payload[v.id] = parseInt(value);
+            });
+
+            if (hasMissing) {
+                alert('Por favor, selecciona una puntuación para todas las preguntas de la escala.');
+                return;
+            }
+
+            dbStudents.push(payload);
+            localStorage.setItem('fisgen_db_students', JSON.stringify(dbStudents));
+            
+            showSuccessScreen();
+        }
+
+        function submitTeacherSelfSurvey(e) {
+            e.preventDefault();
+
+            const payload = {
+                id: 'tch_' + Date.now(),
+                date: new Date().toLocaleString('es-ES'),
+                open_prompt: document.getElementById('tq_open_prompt').value.trim(),
+                open_difficulties: document.getElementById('tq_open_difficulties').value.trim()
+            };
+
+            let hasMissing = false;
+            SURVEY_SCHEMA.teacherSelf.forEach(v => {
+                const value = document.getElementById(`val-${v.id}`).value;
+                if (!value) hasMissing = true;
+                payload[v.id] = parseInt(value);
+            });
+
+            if (hasMissing) {
+                alert('Por favor, completa todas las valoraciones numéricas de autoevaluación.');
+                return;
+            }
+
+            dbTeachers.push(payload);
+            localStorage.setItem('fisgen_db_teachers', JSON.stringify(dbTeachers));
+
+            showSuccessScreen();
+        }
+
+        function showSuccessScreen() {
+            document.getElementById('section-student').classList.add('hidden');
+            document.getElementById('section-self').classList.add('hidden');
+            document.getElementById('section-teacher').classList.add('hidden');
+            document.getElementById('section-success').classList.remove('hidden');
+        }
+
+        function restartForms() {
+            // Reiniciar inputs Alumnos
+            document.getElementById('student-form').reset();
+            document.getElementById('student-course').value = '';
+            document.getElementById('sq_open_fisgen').value = '';
+            document.getElementById('sq_open_teacher').value = '';
+            [...SURVEY_SCHEMA.student.fisgen, ...SURVEY_SCHEMA.student.ai, ...SURVEY_SCHEMA.student.teacher].forEach(v => {
+                document.getElementById(`val-${v.id}`).value = '';
+            });
+
+            // Reiniciar inputs Docente
+            document.getElementById('teacher-self-form').reset();
+            document.getElementById('tq_open_prompt').value = '';
+            document.getElementById('tq_open_difficulties').value = '';
+            SURVEY_SCHEMA.teacherSelf.forEach(v => {
+                document.getElementById(`val-${v.id}`).value = '';
+            });
+
+            // Limpiar estilos de botones
+            document.querySelectorAll('.option-bubble').forEach(btn => {
+                btn.className = btn.className.replace(/bg-\w+-600|border-\w+-600|text-white|shadow-md|scale-105/g, '').trim();
+                btn.classList.add('border-slate-100', 'bg-slate-50', 'text-slate-400');
+            });
+
+            switchView(currentView);
+        }
+
+        // ================= PANEL DOCENTE Y ANALÍTICAS =================
+        function unlockDashboard() {
+            const pass = document.getElementById('teacher-pass').value;
+            if (pass.toLowerCase() === 'profesor') {
+                document.getElementById('auth-error-msg').classList.add('hidden');
+                sessionStorage.setItem('dashboard_unlocked', 'true');
+                isDashboardUnlocked = true;
+                document.getElementById('teacher-auth').classList.add('hidden');
+                document.getElementById('teacher-db').classList.remove('hidden');
+                renderDashboardMetrics();
+            } else {
+                document.getElementById('auth-error-msg').classList.remove('hidden');
+            }
+        }
+
+        function switchDashboardTab(tab) {
+            currentDbTab = tab;
+            document.getElementById('tab-student-metrics').className = `flex-1 py-2 rounded-xl text-xs font-black transition ${tab === 'students' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`;
+            document.getElementById('tab-teacher-metrics').className = `flex-1 py-2 rounded-xl text-xs font-black transition ${tab === 'teachers' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`;
+            
+            document.getElementById('container-db-students').classList.toggle('hidden', tab !== 'students');
+            document.getElementById('container-db-teachers').classList.toggle('hidden', tab !== 'teachers');
+
+            // Redibujar gráficos para evitar bugs de contenedores ocultos de Chart.js
+            setTimeout(renderDashboardMetrics, 50);
+        }
+
+        function renderDashboardMetrics() {
+            // Badges
+            document.getElementById('badge-students').textContent = `${dbStudents.length} respuestas alumnado`;
+            document.getElementById('badge-teachers').textContent = `${dbTeachers.length} autoevaluaciones docentes`;
+
+            if (currentDbTab === 'students') {
+                renderStudentCharts();
+                renderStudentFeedback();
+                renderStudentTable();
+            } else {
+                renderTeacherCharts();
+                renderTeacherFeedback();
+            }
+        }
+
+        function renderStudentCharts() {
+            if (activeCharts.studentAvg) activeCharts.studentAvg.destroy();
+            if (activeCharts.studentRadar) activeCharts.studentRadar.destroy();
+
+            const total = dbStudents.length;
+            if (total === 0) return;
+
+            // Medias
+            let sumFisgen = 0, sumTeacher = 0;
+            let aiDimensions = [0, 0, 0, 0, 0]; // sai1, sai2, sai3, sai4, sai5
+
+            dbStudents.forEach(item => {
+                sumFisgen += (item.sf1 + item.sf2 + item.sf3 + item.sf4 + item.sf5) / 5;
+                sumTeacher += (item.st1 + item.st2 + item.st3) / 3;
+                
+                aiDimensions[0] += item.sai1;
+                aiDimensions[1] += item.sai2;
+                aiDimensions[2] += item.sai3;
+                aiDimensions[3] += item.sai4;
+                aiDimensions[4] += item.sai5;
+            });
+
+            const avgFisgen = parseFloat((sumFisgen / total).toFixed(2));
+            const avgTeacher = parseFloat((sumTeacher / total).toFixed(2));
+            const radarDataset = aiDimensions.map(sum => parseFloat((sum / total).toFixed(2)));
+
+            // Gráfico 1: Barras Comparativas
+            const ctxAvg = document.getElementById('chart-avg').getContext('2d');
+            activeCharts.studentAvg = new Chart(ctxAvg, {
+                type: 'bar',
+                data: {
+                    labels: ['Chatbot FisGen (Experiencia)', 'Apoyo Docente (Rol)'],
+                    datasets: [{
+                        data: [avgFisgen, avgTeacher],
+                        backgroundColor: ['#2563eb', '#16a34a'],
+                        borderRadius: 12,
+                        barThickness: 45
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { min: 0, max: 5 } }
+                }
+            });
+
+            // Gráfico 2: Radar de Competencia IA
+            const ctxRadar = document.getElementById('chart-radar').getContext('2d');
+            activeCharts.studentRadar = new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ['Prompts', 'Verificar', 'Ética', 'Edición', 'Socrático'],
+                    datasets: [{
+                        label: 'Nivel Promedio',
+                        data: radarDataset,
+                        backgroundColor: 'rgba(147, 51, 234, 0.15)',
+                        borderColor: '#9333ea',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#9333ea'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { r: { min: 0, max: 5, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+
+        function renderTeacherCharts() {
+            if (activeCharts.teacherSelf) activeCharts.teacherSelf.destroy();
+
+            const total = dbTeachers.length;
+            if (total === 0) return;
+
+            let metricSums = [0, 0, 0, 0, 0]; // t1, t2, t3, t4, t5
+
+            dbTeachers.forEach(item => {
+                metricSums[0] += item.t1;
+                metricSums[1] += item.t2;
+                metricSums[2] += item.t3;
+                metricSums[3] += item.t4;
+                metricSums[4] += item.t5;
+            });
+
+            const datasets = metricSums.map(sum => parseFloat((sum / total).toFixed(2)));
+
+            const ctxSelf = document.getElementById('chart-teacher-self').getContext('2d');
+            activeCharts.teacherSelf = new Chart(ctxSelf, {
+                type: 'bar',
+                data: {
+                    labels: ['Gestión Aula', 'Eficiencia Bot', 'Logro Objetivos', 'Comp. Digital', 'Plagio'],
+                    datasets: [{
+                        label: 'Evaluación Promedio',
+                        data: datasets,
+                        backgroundColor: '#d97706',
+                        borderRadius: 8,
+                        barThickness: 40
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { min: 0, max: 5 } }
+                }
+            });
+        }
+
+        function renderStudentFeedback() {
+            const boxFisgen = document.getElementById('sc-open-fisgen');
+            const boxTeacher = document.getElementById('sc-open-teacher');
+            boxFisgen.innerHTML = '';
+            boxTeacher.innerHTML = '';
+
+            if (dbStudents.length === 0) {
+                boxFisgen.innerHTML = '<p class="text-slate-400 italic py-4 text-center">No hay comentarios todavía.</p>';
+                boxTeacher.innerHTML = '<p class="text-slate-400 italic py-4 text-center">No hay comentarios todavía.</p>';
+                return;
+            }
+
+            dbStudents.forEach(item => {
+                if (item.open_fisgen) {
+                    boxFisgen.innerHTML += `
+                        <div class="bg-slate-50 border border-slate-150 p-3 rounded-2xl">
+                            <div class="font-extrabold text-[10px] text-physics-600 mb-0.5">${item.course} | ${item.date.split(' ')[0]}</div>
+                            <p class="text-slate-700 font-medium leading-relaxed">"${item.open_fisgen}"</p>
+                        </div>
+                    `;
+                }
+                if (item.open_teacher) {
+                    boxTeacher.innerHTML += `
+                        <div class="bg-emerald-50/50 border border-emerald-100 p-3 rounded-2xl">
+                            <div class="font-extrabold text-[10px] text-emerald-600 mb-0.5">${item.course} | ${item.date.split(' ')[0]}</div>
+                            <p class="text-slate-700 font-medium leading-relaxed">"${item.open_teacher}"</p>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function renderTeacherFeedback() {
+            const boxPrompt = document.getElementById('tc-open-prompt');
+            const boxDiff = document.getElementById('tc-open-difficulties');
+            boxPrompt.innerHTML = '';
+            boxDiff.innerHTML = '';
+
+            if (dbTeachers.length === 0) {
+                boxPrompt.innerHTML = '<p class="text-slate-400 italic py-4 text-center">No hay reflexiones guardadas.</p>';
+                boxDiff.innerHTML = '<p class="text-slate-400 italic py-4 text-center">No hay reflexiones guardadas.</p>';
+                return;
+            }
+
+            dbTeachers.forEach(item => {
+                if (item.open_prompt) {
+                    boxPrompt.innerHTML += `
+                        <div class="bg-amber-50/50 border border-amber-100 p-3 rounded-2xl">
+                            <div class="font-extrabold text-[10px] text-amber-700 mb-0.5">${item.date}</div>
+                            <p class="text-slate-700 font-medium leading-relaxed">"${item.open_prompt}"</p>
+                        </div>
+                    `;
+                }
+                if (item.open_difficulties) {
+                    boxDiff.innerHTML += `
+                        <div class="bg-slate-50 border border-slate-200 p-3 rounded-2xl">
+                            <div class="font-extrabold text-[10px] text-slate-500 mb-0.5">${item.date}</div>
+                            <p class="text-slate-700 font-medium leading-relaxed">"${item.open_difficulties}"</p>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function renderStudentTable() {
+            const tbody = document.getElementById('table-students-body');
+            tbody.innerHTML = '';
+
+            if (dbStudents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-slate-400 italic py-8">No hay respuestas cargadas.</td></tr>';
+                return;
+            }
+
+            dbStudents.forEach(item => {
+                const avgFisgen = ((item.sf1+item.sf2+item.sf3+item.sf4+item.sf5)/5).toFixed(1);
+                const avgAi = ((item.sai1+item.sai2+item.sai3+item.sai4+item.sai5)/5).toFixed(1);
+                const avgTeacher = ((item.st1+item.st2+item.st3)/3).toFixed(1);
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4 text-slate-500 font-semibold">${item.date}</td>
+                        <td class="p-4 font-bold text-slate-900">${item.course}</td>
+                        <td class="p-4 text-center font-extrabold text-physics-600">${avgFisgen}</td>
+                        <td class="p-4 text-center font-extrabold text-ai-600">${avgAi}</td>
+                        <td class="p-4 text-center font-extrabold text-emerald-600">${avgTeacher}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ================= EXPORTACIÓN HOJA DE CÁLCULO (CSV) =================
+        function exportStudentsCSV() {
+            if (dbStudents.length === 0) {
+                alert('No hay respuestas de alumnos para exportar.');
+                return;
+            }
+
+            const headers = [
+                'Fecha', 'Curso', 
+                'SF1_Instrucciones', 'SF2_Pistas', 'SF3_Gamificacion', 'SF4_Dificultad', 'SF5_Moodle', 'Comentarios_FisGen',
+                'SAI1_Prompts', 'SAI2_Verificacion', 'SAI3_Etica', 'SAI4_Edicion', 'SAI5_Socratico',
+                'ST1_Profesor_Clave', 'ST2_Profesor_ResolucionDudas', 'ST3_Profesor_SoporteTecnico', 'Comentarios_Apoyo_Docente'
+            ];
+
+            let csv = "\uFEFF"; // BOM UTF-8
+            csv += headers.map(h => `"${h}"`).join(";") + "\n";
+
+            dbStudents.forEach(r => {
+                const row = [
+                    r.date, r.course,
+                    r.sf1, r.sf2, r.sf3, r.sf4, r.sf5, (r.open_fisgen || '').replace(/"/g, '""').replace(/\n/g, ' '),
+                    r.sai1, r.sai2, r.sai3, r.sai4, r.sai5,
+                    r.st1, r.st2, r.st3, (r.open_teacher || '').replace(/"/g, '""').replace(/\n/g, ' ')
+                ];
+                csv += row.map(val => `"${val}"`).join(";") + "\n";
+            });
+
+            downloadCSV(csv, "FisGen_Resultados_Alumnado.csv");
+        }
+
+        function exportTeacherSelfCSV() {
+            if (dbTeachers.length === 0) {
+                alert('No hay autoevaluaciones docentes para exportar.');
+                return;
+            }
+
+            const headers = [
+                'Fecha', 
+                'T1_Gestion_Aula', 'T2_Eficiencia_Herramienta', 'T3_Logro_Objetivos', 'T4_Competencia_Digital', 'T5_Prevencion_Plagio',
+                'Ajustes_Prompt_FisGen', 'Dificultades_Libreta_Fisica'
+            ];
+
+            let csv = "\uFEFF"; // BOM UTF-8
+            csv += headers.map(h => `"${h}"`).join(";") + "\n";
+
+            dbTeachers.forEach(r => {
+                const row = [
+                    r.date,
+                    r.t1, r.t2, r.t3, r.t4, r.t5,
+                    (r.open_prompt || '').replace(/"/g, '""').replace(/\n/g, ' '),
+                    (r.open_difficulties || '').replace(/"/g, '""').replace(/\n/g, ' ')
+                ];
+                csv += row.map(val => `"${val}"`).join(";") + "\n";
+            });
+
+            downloadCSV(csv, "FisGen_Autoevaluacion_Docente.csv");
+        }
+
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Modales de borrado
+        function showClearModal() {
+            document.getElementById('modal-clear').classList.remove('hidden');
+        }
+
+        function closeClearModal() {
+            document.getElementById('modal-clear').classList.add('hidden');
+        }
+
+        function clearAllData() {
+            dbStudents = [];
+            dbTeachers = [];
+            localStorage.removeItem('fisgen_db_students');
+            localStorage.removeItem('fisgen_db_teachers');
+            closeClearModal();
+            renderDashboardMetrics();
+        }
+    </script>
+</body>
+</html>
